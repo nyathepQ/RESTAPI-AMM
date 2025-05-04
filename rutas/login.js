@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const User = require('../modelos/Usuario');
+const jwt = require('jsonwebtoken');
 
 // Ruta para iniciar sesión
 router.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
     try {
-        // Buscr el usuario por username
+        // Buscar el usuario por username
         const user = await User.findOne({ username });
         if (!user) {
             return res.status(401).json({ message: 'Error: Usuario incorrecto o inexistente'});
@@ -20,13 +21,18 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Error: Contraseña incorrecta'});
         }
 
-        res.status(200).json({ message: 'Autenticación exitosa'});
+        // Crear token
+        const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_INV, {
+            expiresIn: '1h'
+        });
+
+        res.status(200).json({ message: 'Autenticación exitosa', token});
     } catch (error) {
         res.status(500).json({ message: 'Error al iniciar sesión' });
     }
 });
 
-// Ruta para registrar un nuevo usuario
+// Ruta para registrar un nuevo usuario (para test)
 router.post('/register', async (req, res) => {
     const { username, password } = req.body;
 
@@ -38,16 +44,18 @@ router.post('/register', async (req, res) => {
         }
 
         // Encriptar la contraseña por seguridad
-        const encriptedPassword = await bcrypt.hash(password, 10);
+        const salt = await bcrypt.genSalt(10);
+        const encriptedPassword = await bcrypt.hash(password, salt);
 
         // Crear y guardar nuevo usuario
         const newUser = new User({ username, password: encriptedPassword });
         await newUser.save();
 
-        res.status(201).json({ message: 'Usuario registrado existosamente' });
+        res.status(201).json({ message: 'Usuario registrado existosamente', id: newUser._id });
     } catch (error) {
         res.status(500).json({ message: 'Error al registrar usuario' });
     };
 });
 
+// exportar rutas
 module.exports = router;
